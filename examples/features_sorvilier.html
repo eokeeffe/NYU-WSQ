@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="description" content="">
+	<meta name="author" content="">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<title>Potree Viewer</title>
+
+	<link rel="stylesheet" type="text/css" href="../build/potree/potree.css">
+	<link rel="stylesheet" type="text/css" href="../libs/jquery-ui/jquery-ui.min.css">
+	<link rel="stylesheet" type="text/css" href="../libs/openlayers3/ol.css">
+	<link rel="stylesheet" type="text/css" href="../libs/spectrum/spectrum.css">
+	<link rel="stylesheet" type="text/css" href="../libs/jstree/themes/mixed/style.css">
+</head>
+
+<body>
+	<script src="../libs/jquery/jquery-3.1.1.min.js"></script>
+	<script src="../libs/spectrum/spectrum.js"></script>
+	<script src="../libs/jquery-ui/jquery-ui.min.js"></script>
+	<script src="../libs/three.js/build/three.min.js"></script>
+	<script src="../libs/three.js/build/three.module.js"></script>
+	<script src="../libs/three.js/extra/lines.js"></script>
+	<script src="../libs/other/BinaryHeap.js"></script>
+	<script src="../libs/tween/tween.min.js"></script>
+	<script src="../libs/d3/d3.js"></script>
+	<script src="../libs/proj4/proj4.js"></script>
+	<script src="../libs/openlayers3/ol.js"></script>
+	<script src="../libs/i18next/i18next.js"></script>
+	<script src="../libs/jstree/jstree.js"></script>
+	<script src="../build/potree/potree.js"></script>
+	<script src="../libs/plasio/js/laslaz.js"></script>
+	<script src="../libs/other/OBJLoader.js"></script>
+	<script src="../libs/other/PLYLoader.js"></script>
+	
+	
+	<!-- INCLUDE ADDITIONAL DEPENDENCIES HERE -->
+	<!-- INCLUDE SETTINGS HERE -->
+	
+	<div class="potree_container" style="position: absolute; width: 100%; height: 100%; left: 0px; top: 0px; ">
+		<div id="potree_render_area" style="background-image: url('../build/potree/resources/images/background.jpg');"></div>
+		<div id="potree_sidebar_container"> </div>
+	</div>
+	
+	<script type="module">
+	    var ground  = -0.5; //5.653102318608796;
+        var avg_height = 1.5845;// average of men & women aged 20+
+        var cat2 = 0.4096; //2 feet from MOM inondaton modelling
+        var cat3 = 0.8192; //1.524 = 5 feet from MOM inondation modelling 
+        // changing to 4 feet  1.2192
+        var cat4 = 2.4384; //8 feet from MOM inondation modelling
+        var water;
+        var counter =-1;
+	
+	    //import * as THREE from './LIBS/three.module.js';
+	    import { Water } from './LIBS/Water.js';
+	
+		window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
+		
+		viewer.setEDLEnabled(true);
+		viewer.setFOV(60);
+		viewer.setPointBudget(1.7*1000*1000);
+		viewer.setControls(viewer.fpControls);
+		//viewer.setControls(viewer.earthControls);
+		viewer.setMoveSpeed(5.0);
+		viewer.useHQ = true;
+		viewer.setBackground("skybox");
+		viewer.loadSettingsFromURL();
+		
+		viewer.setDescription("Potree Rendered WSQ LIDAR scan, <br>  W/D Forward/Backward <br> A/D for Left/Right");
+		
+		viewer.loadGUI(() => {
+			viewer.setLanguage('en');
+			//$("#menu_tools").next().show();
+			//$("#menu_scene").next().show();
+			//viewer.toggleSidebar();
+		});
+		
+		// Sigeom
+		//Potree.loadPointCloud("../pointclouds/vol_total/cloud.js", "sigeom.sa", function(e){
+		Potree.loadPointCloud("http://10.0.0.6:9000/WSQ-CLEAN/cloud.js", "WSQ", function(e){
+			let scene = viewer.scene;
+			scene.addPointCloud(e.pointcloud);
+			
+			let material = e.pointcloud.material;
+			material.size = 0.6;
+			material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
+			material.shape = Potree.PointShape.SQUARE;
+			material.activeAttributeName = "color";
+
+			//scene.view.position.set(589974.341, 231698.397, 986.146);
+			scene.view.position.set(138.77714404568522, 82.0838536645403, ground+avg_height);
+			//scene.view.lookAt(new THREE.Vector3(589851.587, 231428.213, 715.634));
+			scene.view.lookAt(new THREE.Vector3(26.625725792113652,18.999332311487507,18.690582401871687));
+			// viewer.fitToScreen();
+		});
+
+        {//annotations
+            
+            viewer.scene.annotations.add(new Potree.Annotation({
+				position: [120.38519737053774, 71.85093623604608, 1.7845],
+				cameraPosition: [590034.03, 231814.02, 961.68],
+				cameraTarget: [589847.17, 231436.78, 742.60],
+				title: "Bobst Library"
+			}));
+        }
+
+		{ // load the water texture here & lights
+		    /*
+			const directional = new THREE.DirectionalLight( 0xffffff, 0.8);
+			directional.position.set( 138.77714404568522, 82.0838536645403, 100 );
+			directional.lookAt(138.77714404568522, 82.0838536645403, 0);
+
+			//const ambient = new THREE.AmbientLight(0x555555);
+			viewer.scene.scene.add(directional);
+			//viewer.scene.scene.add(ambient);
+			
+			*/
+			var parameters = {
+					distance: 400,
+					inclination: 0.49,
+					azimuth: 0.205
+			};
+			
+			//var light = new THREE.DirectionalLight( 0xffffff, 0.8 );
+			var light = new THREE.HemisphereLight( 0xffffbb, 0x080820, 1 )
+			//light.lookAt(138.77714404568522, 82.0838536645403, 0);
+			
+			var theta = Math.PI * ( parameters.inclination - 0.5 );
+			var phi = 2 * Math.PI * ( parameters.azimuth - 0.5 );
+					
+			light.position.x = parameters.distance * Math.cos( phi );
+			light.position.y = parameters.distance * Math.sin( phi ) * Math.sin( theta );
+			light.position.z = parameters.distance * Math.sin( phi ) * Math.cos( theta );
+			viewer.scene.scene.add( light );
+			
+            var waterGeometry = new THREE.PlaneBufferGeometry( 1000, 1000 );
+				
+			water = new Water(
+					waterGeometry,
+					{
+						textureWidth: 512,
+						textureHeight: 512,
+						waterNormals: new THREE.TextureLoader().load( 'waternormals.jpg', function ( texture ) {
+							texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+						} ),
+						alpha: 0.8,
+						//sunDirection: light.position.clone().normalize(),
+						sunColor: 0xffffff,
+						//waterColor: 0x001e0f,
+						waterColor: 0x4B93C5,
+						distortionScale: 3.7,
+						fog: viewer.scene.scene.fog !== undefined
+					}
+				);
+            
+            //water.material.uniforms[ 'sunDirection' ].value.copy( light.position ).normalize();
+            
+            water.position.set(138, 82 , ground-0.5);
+            water.rotation.x= 0;//(- Math.PI / 2) ;
+            water.rotation.y= 0;
+            water.rotation.z= 0;
+            
+			viewer.scene.scene.add(water);
+			
+			viewer.onGUILoaded(() => {
+				// Add entries to object list in sidebar
+				let tree = $(`#jstree_scene`);
+				let parentNode = "other";
+
+				let water1 = tree.jstree('create_node', parentNode, { 
+						text: "water", 
+						icon: `${Potree.resourcePath}/icons/triangle.svg`,
+						data: water
+					}, 
+					"last", false, false);
+				tree.jstree(water.visible ? "check_node" : "uncheck_node", water1);
+			});
+        }
+
+        window.setInterval(function(){
+            water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
+        }, 1);
+        
+        window.setInterval(function(){
+            viewer.scene.view.position.z = ground + avg_height;
+        }, 5);
+        
+        window.setInterval(function(){
+            viewer.setMoveSpeed(5.0);
+        }, 100);
+        
+        window.setInterval(function(){
+            counter += 1;
+            if(counter==0){
+                water.position.z = ground-5;
+            }
+            if(counter==1){
+                water.position.z = ground + cat2;
+            }
+            if(counter==2){
+                water.position.z = ground + cat3;
+            }
+            if(counter>2){
+                counter = -1;
+            }
+        }, 15000);
+	</script>
+	
+	
+  </body>
+</html>
