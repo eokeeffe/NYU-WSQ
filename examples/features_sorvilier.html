@@ -43,10 +43,10 @@
 	</div>
 	
 	<script type="module">
-	    var ground  = -0.5; //5.653102318608796;
+	    var ground  = -1.4444525886271156; //-0.5; //5.653102318608796;
         var avg_height = 1.5845;// average of men & women aged 20+
-        var cat2 = 0.4096; //2 feet from MOM inondaton modelling
-        var cat3 = 0.8192; //1.524 = 5 feet from MOM inondation modelling 
+        var cat2 = 0.4096/2.0; //2 feet from MOM inondaton modelling
+        var cat3 = 0.8192/2.0; //1.524 = 5 feet from MOM inondation modelling 
         // changing to 4 feet  1.2192
         var cat4 = 2.4384; //8 feet from MOM inondation modelling    
         var counter =-1;
@@ -175,7 +175,7 @@
 			material.activeAttributeName = "color";
 
 			//scene.view.position.set(589974.341, 231698.397, 986.146);
-			scene.view.position.set(138.77714404568522, 82.0838536645403, ground+avg_height);
+			scene.view.position.set(135.78202037097398, 47.97623322623757, ground+avg_height);
 			//scene.view.lookAt(new THREE.Vector3(589851.587, 231428.213, 715.634));
 			scene.view.lookAt(new THREE.Vector3(26.625725792113652,18.999332311487507,18.690582401871687));
 			//viewer.fitToScreen();
@@ -184,9 +184,9 @@
         {//annotations
             
             viewer.scene.annotations.add(new Potree.Annotation({
-				position: [120.38519737053774, 71.85093623604608, 1.7845],
-				cameraPosition: [590034.03, 231814.02, 961.68],
-				cameraTarget: [589847.17, 231436.78, 742.60],
+				position: [111.33608947683001, 46.353442758382016, 1.7845],
+				cameraPosition: [113.14700589454,47.59560559285236, 1.7845],
+				cameraTarget: [26.625725792113652,18.999332311487507,18.690582401871687],
 				title: "Bobst Library"
 			}));
         }
@@ -219,7 +219,7 @@
 
         window.setInterval(function(){
             //water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
-            _shader.uniforms.uTime.value += 1.0 / 60.0;
+            _shader.uniforms.uTime.value += 1.0 / 120.0;
             viewer.scene.view.position.z = ground + avg_height;
         }, 1);
         
