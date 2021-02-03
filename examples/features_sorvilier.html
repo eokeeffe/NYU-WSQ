@@ -48,9 +48,13 @@
         var cat2 = 0.4096; //2 feet from MOM inondaton modelling
         var cat3 = 0.8192; //1.524 = 5 feet from MOM inondation modelling 
         // changing to 4 feet  1.2192
-        var cat4 = 2.4384; //8 feet from MOM inondation modelling
-        var water;
+        var cat4 = 2.4384; //8 feet from MOM inondation modelling    
         var counter =-1;
+	
+	    var water;
+        var waterGeometry, waternormals;
+        
+        var _geometry, _shader, _mesh;
 	
 	    //import * as THREE from './LIBS/three.module.js';
 	    import { Water } from './LIBS/Water.js';
@@ -59,7 +63,7 @@
 		
 		viewer.setEDLEnabled(true);
 		viewer.setFOV(60);
-		viewer.setPointBudget(1.7*1000*1000);
+		viewer.setPointBudget(1.5*1000*1000);
 		viewer.setControls(viewer.fpControls);
 		//viewer.setControls(viewer.earthControls);
 		viewer.setMoveSpeed(5.0);
@@ -76,12 +80,93 @@
 			//viewer.toggleSidebar();
 		});
 		
+		var vertexShader = `
+        #define SCALE 10.0
+
+        varying vec2 vUv;
+
+        uniform float uTime;
+
+        float calculateSurface(float x, float z) {
+            float y = 0.0;
+            y += (sin(x * 1.0 / SCALE + uTime * 1.0) + sin(x * 2.3 / SCALE + uTime * 1.5) + sin(x * 3.3 / SCALE + uTime * 0.4)) / 3.0;
+            y += (sin(z * 0.2 / SCALE + uTime * 1.8) + sin(z * 1.8 / SCALE + uTime * 1.8) + sin(z * 2.8 / SCALE + uTime * 0.8)) / 3.0;
+            return y;
+        }
+
+        void main() {
+            vUv = uv;
+            vec3 pos = position;
+            
+            float strength = 1.0;
+            pos.y += strength * calculateSurface(pos.x, pos.z);
+            pos.y -= strength * calculateSurface(0.0, 0.0);
+
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }  
+        `;
+    
+        var fragmentShader = `
+        varying vec2 vUv;
+
+        uniform sampler2D uMap;
+        uniform float uTime;
+        uniform vec3 uColor;
+
+        void main() {
+            vec2 uv = vUv * 10.0 + vec2(uTime * -0.05);
+
+            uv.y += 0.01 * (sin(uv.x * 3.5 + uTime * 0.35) + sin(uv.x * 4.8 + uTime * 1.05) + sin(uv.x * 7.3 + uTime * 0.45)) / 3.0;
+            uv.x += 0.12 * (sin(uv.y * 4.0 + uTime * 0.5) + sin(uv.y * 6.8 + uTime * 0.75) + sin(uv.y * 11.3 + uTime * 0.2)) / 3.0;
+            uv.y += 0.12 * (sin(uv.x * 4.2 + uTime * 0.64) + sin(uv.x * 6.3 + uTime * 1.65) + sin(uv.x * 8.2 + uTime * 0.45)) / 3.0;
+
+            vec4 tex1 = texture2D(uMap, uv * 1.0);
+            vec4 tex2 = texture2D(uMap, uv * 1.0 + vec2(0.2));
+
+            vec3 blue = uColor;
+
+            gl_FragColor = vec4(blue + vec3(tex1.a * 0.9 - tex2.a * 0.02), 1.0);
+        }
+        `;
+        
+        function initShader() {
+            var uniforms = {
+                uMap: {type: 't', value: null},
+                uTime: {type: 'f', value: 0},
+                uColor: {type: 'f', value: new THREE.Color('#667fd0')},//#0051da
+            };
+
+            _shader = new THREE.ShaderMaterial({
+                uniforms: uniforms,
+                vertexShader: vertexShader,
+                fragmentShader: fragmentShader,
+                side: THREE.DoubleSide,
+                opacity: 0.8,
+            });
+
+            var textureLoader = new THREE.TextureLoader();
+            //https://cinemont.com/tutorials/zelda/water.png
+            //waternormals.jpg
+            textureLoader.load('water.png', function (texture) {
+                _shader.uniforms.uMap.value = texture;
+                texture.wrapS = texture.wrapT = THREE.REPEAT_WRAPPING;
+            });
+        }
+        
+        initShader();//load the ocean shader
+		
 		// Sigeom
 		//Potree.loadPointCloud("../pointclouds/vol_total/cloud.js", "sigeom.sa", function(e){
 		//Potree.loadPointCloud("http://10.0.0.6:9000/WSQ-CLEAN/cloud.js", "WSQ", function(e){
 		Potree.loadPointCloud("../pointclouds/WSQ-CLEAN/cloud.js", "WSQ", function(e){
 			let scene = viewer.scene;
 			scene.addPointCloud(e.pointcloud);
+			
+			//e.pointcloud.scale.set(100, 100, 100);
+			//e.pointcloud.flipYZ= false;
+			e.pointcloud.updateMatrixWorld();
+			
+			//e.pointcloud.rotation.set(0, -2 * (Math.PI/180), 0);
 			
 			let material = e.pointcloud.material;
 			material.size = 0.6;
@@ -93,7 +178,7 @@
 			scene.view.position.set(138.77714404568522, 82.0838536645403, ground+avg_height);
 			//scene.view.lookAt(new THREE.Vector3(589851.587, 231428.213, 715.634));
 			scene.view.lookAt(new THREE.Vector3(26.625725792113652,18.999332311487507,18.690582401871687));
-			// viewer.fitToScreen();
+			//viewer.fitToScreen();
 		});
 
         {//annotations
@@ -107,62 +192,15 @@
         }
 
 		{ // load the water texture here & lights
-		    /*
-			const directional = new THREE.DirectionalLight( 0xffffff, 0.8);
-			directional.position.set( 138.77714404568522, 82.0838536645403, 100 );
-			directional.lookAt(138.77714404568522, 82.0838536645403, 0);
-
-			//const ambient = new THREE.AmbientLight(0x555555);
-			viewer.scene.scene.add(directional);
-			//viewer.scene.scene.add(ambient);
-			
-			*/
-			var parameters = {
-					distance: 400,
-					inclination: 0.49,
-					azimuth: 0.205
-			};
-			
-			//var light = new THREE.DirectionalLight( 0xffffff, 0.8 );
-			var light = new THREE.HemisphereLight( 0xffffbb, 0x080820, 1 )
-			//light.lookAt(138.77714404568522, 82.0838536645403, 0);
-			
-			var theta = Math.PI * ( parameters.inclination - 0.5 );
-			var phi = 2 * Math.PI * ( parameters.azimuth - 0.5 );
-					
-			light.position.x = parameters.distance * Math.cos( phi );
-			light.position.y = parameters.distance * Math.sin( phi ) * Math.sin( theta );
-			light.position.z = parameters.distance * Math.sin( phi ) * Math.cos( theta );
-			viewer.scene.scene.add( light );
-			
-            var waterGeometry = new THREE.PlaneBufferGeometry( 1000, 1000 );
-				
-			water = new Water(
-					waterGeometry,
-					{
-						textureWidth: 512,
-						textureHeight: 512,
-						waterNormals: new THREE.TextureLoader().load( 'waternormals.jpg', function ( texture ) {
-							texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-						} ),
-						alpha: 0.8,
-						//sunDirection: light.position.clone().normalize(),
-						sunColor: 0xffffff,
-						//waterColor: 0x001e0f,
-						waterColor: 0x4B93C5,
-						distortionScale: 3.7,
-						fog: viewer.scene.scene.fog !== undefined
-					}
-				);
-            
-            //water.material.uniforms[ 'sunDirection' ].value.copy( light.position ).normalize();
-            
-            water.position.set(138, 82 , ground-0.5);
-            water.rotation.x= 0;//(- Math.PI / 2) ;
-            water.rotation.y= 0;
-            water.rotation.z= 0;
-            
-			viewer.scene.scene.add(water);
+		    
+		    //create the geometry
+		    _geometry = new THREE.PlaneBufferGeometry(400, 400, 10, 10);
+		    //create the mesh that will hold the geometry
+		    _mesh = new THREE.Mesh(_geometry, _shader);
+		    _mesh.position.set(138.77714404568522, 82.0838536645403, ground);
+		    _mesh.visible = false;
+            //add the mesh to the scene
+			viewer.scene.scene.add(_mesh);
 			
 			viewer.onGUILoaded(() => {
 				// Add entries to object list in sidebar
@@ -172,20 +210,18 @@
 				let water1 = tree.jstree('create_node', parentNode, { 
 						text: "water", 
 						icon: `${Potree.resourcePath}/icons/triangle.svg`,
-						data: water
+						data: _mesh
 					}, 
 					"last", false, false);
-				tree.jstree(water.visible ? "check_node" : "uncheck_node", water1);
+				tree.jstree(_mesh.visible ? "check_node" : "uncheck_node", water1);
 			});
         }
 
         window.setInterval(function(){
-            water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
-        }, 1);
-        
-        window.setInterval(function(){
+            //water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
+            _shader.uniforms.uTime.value += 1.0 / 60.0;
             viewer.scene.view.position.z = ground + avg_height;
-        }, 5);
+        }, 1);
         
         window.setInterval(function(){
             viewer.setMoveSpeed(5.0);
@@ -194,15 +230,19 @@
         window.setInterval(function(){
             counter += 1;
             if(counter==0){
-                water.position.z = ground-5;
+                _mesh.visible = true;
+                _mesh.position.z = ground + cat2;
             }
             if(counter==1){
-                water.position.z = ground + cat2;
+                _mesh.position.z = ground + cat3;
             }
+            /*
             if(counter==2){
-                water.position.z = ground + cat3;
+                _mesh.position.z = ground + cat4;
             }
-            if(counter>2){
+            */
+            if(counter>1){
+                _mesh.visible = false;
                 counter = -1;
             }
         }, 15000);
