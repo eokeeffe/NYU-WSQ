@@ -53,6 +53,9 @@
 	
 	    var water;
         var waterGeometry, waternormals;
+        var waterUp = false;
+        var variance = 0.02;
+        var debug = false;
         
         var _geometry, _shader, _mesh;
 	
@@ -98,9 +101,9 @@
             vUv = uv;
             vec3 pos = position;
             
-            float strength = 1.0;
-            pos.y += strength * calculateSurface(pos.x, pos.z);
-            pos.y -= strength * calculateSurface(0.0, 0.0);
+            float strength = 0.5;
+            pos.z += strength * calculateSurface(pos.x, pos.z);
+            pos.z -= strength * calculateSurface(0.0, 0.0);
 
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }  
@@ -141,7 +144,7 @@
                 vertexShader: vertexShader,
                 fragmentShader: fragmentShader,
                 side: THREE.DoubleSide,
-                opacity: 0.8,
+                opacity: 0.6,
             });
 
             var textureLoader = new THREE.TextureLoader();
@@ -179,6 +182,9 @@
 			//scene.view.lookAt(new THREE.Vector3(589851.587, 231428.213, 715.634));
 			scene.view.lookAt(new THREE.Vector3(26.625725792113652,18.999332311487507,18.690582401871687));
 			//viewer.fitToScreen();
+			if(debug){
+			    viewer.scene.pointclouds[0].visible = false;
+			 }
 		});
 
         {//annotations
@@ -194,13 +200,18 @@
 		{ // load the water texture here & lights
 		    
 		    //create the geometry
-		    _geometry = new THREE.PlaneBufferGeometry(400, 400, 10, 10);
+		    _geometry = new THREE.PlaneBufferGeometry(500,500,100,100);
 		    //create the mesh that will hold the geometry
 		    _mesh = new THREE.Mesh(_geometry, _shader);
 		    _mesh.position.set(138.77714404568522, 82.0838536645403, ground);
-		    _mesh.visible = false;
+		    if(debug){
+		        _mesh.visible = false;
+		    }
             //add the mesh to the scene
 			viewer.scene.scene.add(_mesh);
+			
+			const axesHelper = new THREE.AxesHelper( 20 );
+            viewer.scene.scene.add( axesHelper );
 			
 			viewer.onGUILoaded(() => {
 				// Add entries to object list in sidebar
@@ -216,21 +227,33 @@
 				tree.jstree(_mesh.visible ? "check_node" : "uncheck_node", water1);
 			});
         }
-
+        
+        
+        
+        function animate(e){
+            requestAnimationFrame(animate);
+            _shader.uniforms.uTime.value = e * 0.001;
+            viewer.scene.view.position.z = ground + avg_height;
+            viewer.setMoveSpeed(5.0);
+        };
+        
+        /*
         window.setInterval(function(){
             //water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
-            _shader.uniforms.uTime.value += 1.0 / 120.0;
-            viewer.scene.view.position.z = ground + avg_height;
+            
         }, 1);
         
         window.setInterval(function(){
-            viewer.setMoveSpeed(5.0);
+            
         }, 100);
+        */
         
         window.setInterval(function(){
             counter += 1;
             if(counter==0){
-                _mesh.visible = true;
+                if(debug){
+		            _mesh.visible = true;
+		        }
                 _mesh.position.z = ground + cat2;
             }
             if(counter==1){
@@ -242,10 +265,14 @@
             }
             */
             if(counter>1){
-                _mesh.visible = false;
+                if(debug){
+		            _mesh.visible = false;
+		        }
                 counter = -1;
             }
         }, 15000);
+        
+        requestAnimationFrame(animate);
 	</script>
 	
 	
